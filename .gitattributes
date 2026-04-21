@@ -1,0 +1,8 @@
+.venv/ export-ignore
+.tmp/ export-ignore
+__pycache__/ export-ignore
+*.py[cod] export-ignore
+tests/_tmp/ export-ignore
+tests/__pycache__/ export-ignore
+data/search_history_backup.json export-ignore
+data/search_history_pending.json export-ignore
