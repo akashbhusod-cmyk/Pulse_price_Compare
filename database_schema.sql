@@ -1,8 +1,5 @@
-CREATE DATABASE IF NOT EXISTS `pulse_price_compare`
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE `pulse_price_compare`;
+-- Import this file into an already selected MySQL database.
+-- It only creates the application table and avoids CREATE DATABASE / USE statements.
 
 CREATE TABLE IF NOT EXISTS `searched_products` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,

@@ -7,15 +7,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
   <body>
     <main class="shell">
       <header class="site-header">
         <a class="site-title" href="/">Pulse Price Compare</a>
-        <div class="header-actions">
-          <a class="history-link" href="/search-history">History</a>
-        </div>
       </header>
 
       <section class="hero">
@@ -24,7 +22,7 @@
           <h1>Compare product prices across platforms in one search.</h1>
         </div>
 
-        <form class="search-panel" method="get" action="/">
+        <form class="search-panel" method="get" action="/" data-search-form>
           <label for="q">Search a product</label>
           <div class="search-row">
             <input
@@ -34,12 +32,18 @@
               value="{{ query }}"
               autocomplete="off"
             >
-            <button type="submit">Compare</button>
+            <button type="submit" data-search-button>Compare</button>
           </div>
         </form>
       </section>
 
       {% if result %}
+        {% if result.interpreted_query %}
+          <section class="banner banner-info">
+            <strong>Smart search:</strong> {{ result.interpreted_query }}
+          </section>
+        {% endif %}
+
         <section class="summary-grid">
           <article class="metric-card">
             <span>Total offers</span>
@@ -72,15 +76,26 @@
         </section>
 
         {% if result.live_required_message %}
-          <section class="banner banner-warn">
-            <strong>Live results required:</strong> {{ result.live_required_message }}
+          <section class="banner banner-info">
+            <strong>Marketplace expansion:</strong> {{ result.live_required_message }}
+          </section>
+        {% endif %}
+
+        {% if result.fallback_message %}
+          <section class="banner banner-info">
+            <strong>Recommended matches:</strong> {{ result.fallback_message }}
+          </section>
+        {% endif %}
+
+        {% if result.no_discount_message %}
+          <section class="banner banner-info">
+            <strong>Current price snapshot:</strong> {{ result.no_discount_message }}
           </section>
         {% endif %}
 
         {% if result.summary.total_offers == 0 and result.search_suggestions %}
-          <section class="banner banner-warn">
-            <strong>No exact product match found.</strong>
-            Try:
+          <section class="banner banner-info">
+            <strong>Try these search-ready variations.</strong>
             {% for suggestion in result.search_suggestions %}
               <a href="/?q={{ suggestion | urlencode }}">{{ suggestion }}</a>{% if not loop.last %}, {% endif %}
             {% endfor %}
@@ -88,10 +103,57 @@
         {% endif %}
 
         {% if result.used_demo_fallback %}
-          <section class="banner banner-warn">
-            <strong>Demo mode:</strong> no live provider returned offers. Only bundled sample catalog matches are shown, and unknown products will not display invented prices.
+          <section class="banner banner-info">
+            <strong>Sample catalog active:</strong> bundled product matches are ready to explore, and live provider results can be added anytime.
           </section>
         {% endif %}
+
+        <section class="analytics-block">
+          <div class="section-head">
+            <div>
+              <h2>Price analysis</h2>
+              <span>Visual breakdown of the current result set</span>
+            </div>
+          </div>
+          <div class="analytics-grid">
+            <article class="analytics-card analytics-card-wide">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="eyebrow">Price curve</p>
+                  <h3>How prices spread across results</h3>
+                </div>
+                <span class="analytics-note">Lowest to highest</span>
+              </div>
+              <div class="chart-surface" data-chart="price-curve">
+                <p class="chart-fallback">Preparing price curve...</p>
+              </div>
+            </article>
+
+            <article class="analytics-card">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="eyebrow">Platform view</p>
+                  <h3>Cheapest offer by platform</h3>
+                </div>
+              </div>
+              <div class="chart-surface" data-chart="platform-bars">
+                <p class="chart-fallback">Preparing platform analysis...</p>
+              </div>
+            </article>
+
+            <article class="analytics-card">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="eyebrow">Quick read</p>
+                  <h3>Result intelligence</h3>
+                </div>
+              </div>
+              <div class="insight-stack" data-chart="insight-panel">
+                <p class="chart-fallback">Preparing result insights...</p>
+              </div>
+            </article>
+          </div>
+        </section>
 
         <section class="highlights">
           <article class="highlight-card">
@@ -116,7 +178,8 @@
                 {{ "Open listing" if result.highlights.cheapest.source_type.startswith("live") else "Open search results" }}
               </a>
             {% else %}
-              <h2>No offers found</h2>
+              <h2>Search suggestions ready</h2>
+              <p>Broader product names and connected live providers can unlock even more listings.</p>
             {% endif %}
           </article>
 
@@ -142,8 +205,8 @@
                 {{ "Open listing" if result.highlights.highest_savings.source_type.startswith("live") else "Open search results" }}
               </a>
             {% else %}
-              <h2>No discount data available</h2>
-              <p>Live APIs sometimes return current price without old price.</p>
+              <h2>Current price picks ready</h2>
+              <p>Savings highlights appear automatically whenever providers include old-price details.</p>
             {% endif %}
           </article>
         </section>
@@ -184,12 +247,28 @@
 
         <section class="results-block">
           <div class="section-head">
-            <h2>Best price first</h2>
-            <span>{{ result.query }}</span>
+            <div>
+              <h2 data-sort-heading>Best price first</h2>
+              <span>{{ result.query }}</span>
+            </div>
+            <div class="sort-controls" aria-label="Sort offers">
+              <button type="button" class="sort-button is-active" data-sort-button data-sort-by="price">
+                Sort by Price
+              </button>
+              <button type="button" class="sort-button" data-sort-button data-sort-by="savings">
+                Sort by Savings
+              </button>
+            </div>
           </div>
-          <div class="offer-grid">
+          <div class="offer-grid" data-offer-grid>
             {% for offer in result.offers_by_price %}
-              <article class="offer-card">
+              <article
+                class="offer-card"
+                data-offer-card
+                data-price="{{ offer.price }}"
+                data-savings="{{ offer.savings_amount }}"
+                data-title="{{ offer.title | lower }}"
+              >
                 {% if offer.image_url %}
                   <img
                     class="offer-image"
@@ -202,32 +281,36 @@
                     <span>{{ "Sample catalog did not include an image." if offer.provider == "demo" else "Live provider did not return an image." }}</span>
                   </div>
                 {% endif %}
-                <div class="offer-top">
-                  <p class="offer-platform">{{ offer.platform }}</p>
-                  <span class="offer-provider">{{ offer.provider }}</span>
+                <div class="offer-body">
+                  <div class="offer-top">
+                    <p class="offer-platform">{{ offer.platform }}</p>
+                    <span class="offer-provider">{{ offer.provider }}</span>
+                  </div>
+                  <h3>{{ offer.title }}</h3>
+                  <p class="offer-price">Rs. {{ "{:,.0f}".format(offer.price) }}</p>
+                  <div class="offer-metadata">
+                    <p class="offer-meta">
+                      {% if offer.old_price %}
+                        MRP Rs. {{ "{:,.0f}".format(offer.old_price) }}
+                      {% else %}
+                        Current market listing
+                      {% endif %}
+                    </p>
+                    <p class="offer-meta">
+                      {% if offer.savings_amount > 0 %}
+                        Save Rs. {{ "{:,.0f}".format(offer.savings_amount) }} ({{ offer.savings_percent }}%)
+                      {% else %}
+                        No discount metadata
+                      {% endif %}
+                    </p>
+                    <p class="offer-meta">
+                      {% if offer.delivery %}{{ offer.delivery }}{% else %}Delivery details not provided{% endif %}
+                    </p>
+                  </div>
+                  <a class="offer-link" href="{{ offer.product_url }}" target="_blank" rel="noreferrer">
+                    {{ "View listing" if offer.source_type.startswith("live") else "Open search results" }}
+                  </a>
                 </div>
-                <h3>{{ offer.title }}</h3>
-                <p class="offer-price">Rs. {{ "{:,.0f}".format(offer.price) }}</p>
-                <p class="offer-meta">
-                  {% if offer.old_price %}
-                    MRP Rs. {{ "{:,.0f}".format(offer.old_price) }}
-                  {% else %}
-                    Current market listing
-                  {% endif %}
-                </p>
-                <p class="offer-meta">
-                  {% if offer.savings_amount > 0 %}
-                    Save Rs. {{ "{:,.0f}".format(offer.savings_amount) }} ({{ offer.savings_percent }}%)
-                  {% else %}
-                    No discount metadata
-                  {% endif %}
-                </p>
-                <p class="offer-meta">
-                  {% if offer.delivery %}{{ offer.delivery }}{% else %}Delivery details not provided{% endif %}
-                </p>
-                <a class="offer-link" href="{{ offer.product_url }}" target="_blank" rel="noreferrer">
-                  {{ "View listing" if offer.source_type.startswith("live") else "Open search results" }}
-                </a>
               </article>
             {% endfor %}
           </div>
@@ -275,62 +358,11 @@
         </section>
       {% endif %}
 
-      {% if recent_searches %}
-        <section class="table-block">
-          <div class="section-head">
-            <h2>Recent searches</h2>
-            <span>Saved searches</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Offers</th>
-                  <th>Platforms</th>
-                  <th>Lowest price</th>
-                  <th>Cheapest listing</th>
-                  <th>Searched at</th>
-                </tr>
-              </thead>
-              <tbody data-load-more-container data-initial-items="5">
-                {% for search in recent_searches %}
-                  <tr data-load-more-item {% if loop.index > 5 %}hidden{% endif %}>
-                    <td><a href="/?q={{ search.query_text | urlencode }}">{{ search.query_text }}</a></td>
-                    <td>{{ search.total_offers }}</td>
-                    <td>{{ search.platform_count }}</td>
-                    <td>
-                      {% if search.lowest_price is not none %}
-                        Rs. {{ "{:,.0f}".format(search.lowest_price) }}
-                      {% else %}
-                        --
-                      {% endif %}
-                    </td>
-                    <td>
-                      {% if search.cheapest_title %}
-                        {{ search.cheapest_title }}
-                        {% if search.cheapest_platform %}<br><span class="muted">{{ search.cheapest_platform }}</span>{% endif %}
-                      {% else %}
-                        --
-                      {% endif %}
-                    </td>
-                    <td>{{ search.searched_at.strftime("%d %b %Y, %I:%M %p") if search.searched_at else "--" }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if recent_searches|length > 5 %}
-            <div class="load-more-wrap">
-              <button type="button" class="load-more-button" data-load-more-button data-step="5">
-                Load more
-              </button>
-            </div>
-          {% endif %}
-        </section>
-      {% endif %}
     </main>
 
+    {% if result %}
+      <script id="offer-analysis-data" type="application/json">{{ result.offers_by_price | tojson }}</script>
+    {% endif %}
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
   </html>

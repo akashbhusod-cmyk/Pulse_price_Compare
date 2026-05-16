@@ -34,19 +34,10 @@ def create_app() -> Flask:
             "index.html",
             query=query,
             result=result,
-            recent_searches=search_history.recent_searches(),
             database_status=search_history.status,
             active_providers=settings.provider_names,
             default_location=settings.default_location,
             demo_enabled=settings.enable_demo_fallback,
-        )
-
-    @app.get("/search-history")
-    def search_history_page():
-        return render_template(
-            "history.html",
-            searches=search_history.recent_searches(limit=100),
-            database_status=search_history.status,
         )
 
     @app.get("/api/search")
@@ -57,19 +48,6 @@ def create_app() -> Flask:
         result = service.search(query)
         search_history.record_search(result)
         return jsonify(result)
-
-    @app.get("/api/search-history")
-    def api_search_history():
-        return jsonify(
-            {
-                "database": {
-                    "enabled": search_history.status.enabled,
-                    "available": search_history.status.available,
-                    "message": search_history.status.message,
-                },
-                "searches": search_history.recent_searches(limit=100),
-            }
-        )
 
     @app.get("/health")
     def health():

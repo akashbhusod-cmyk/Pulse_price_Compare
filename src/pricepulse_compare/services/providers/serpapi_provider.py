@@ -64,6 +64,11 @@ class SerpApiProvider(SearchProvider):
     }
     laptop_brands = {"dell", "hp", "lenovo", "asus", "acer", "msi", "apple", "macbook"}
     tv_terms = {"tv", "television", "smart tv", "oled", "qled"}
+    generic_phone_terms = {"5g", "mobile", "phone", "smartphone", "smartphones"}
+    budget_pattern = re.compile(
+        r"(?:under|below|less than|max|max\.|upto|up to)\s*₹?\s*([0-9]+(?:,[0-9]+)*)",
+        re.IGNORECASE,
+    )
     trusted_platforms = {
         "amazon": {"amazon", "amazon.in"},
         "flipkart": {"flipkart"},
@@ -161,6 +166,7 @@ class SerpApiProvider(SearchProvider):
         search_results = payload.get("shopping_results", [])
         if not isinstance(search_results, list):
             return offers
+        should_expand_details = self._should_expand_store_offers(query)
 
         for index, item in enumerate(search_results[: self.settings.result_limit]):
             if not isinstance(item, dict):
@@ -170,7 +176,11 @@ class SerpApiProvider(SearchProvider):
             if fallback_offer is None:
                 continue
 
-            if index < self.settings.serpapi_max_product_details and self._matching_offers(query, [fallback_offer], strict=True):
+            if (
+                should_expand_details
+                and index < self.settings.serpapi_max_product_details
+                and self._matching_offers(query, [fallback_offer], strict=True)
+            ):
                 store_offers = self._fetch_store_offers(item)
                 relevant_store_offers = self._matching_offers(query, store_offers, strict=True)
                 if relevant_store_offers:
@@ -299,12 +309,14 @@ class SerpApiProvider(SearchProvider):
         strict = self._matching_offers(query, offers, strict=True)
         if strict:
             trusted = self._trusted_offers(query, strict)
-            return trusted if trusted else []
+            ranked = trusted if trusted else []
+            return self._budget_ranked_offers(query, ranked)
 
         relaxed = self._matching_offers(query, offers, strict=False)
         if relaxed:
             trusted = self._trusted_offers(query, relaxed)
-            return trusted if trusted else []
+            ranked = trusted if trusted else []
+            return self._budget_ranked_offers(query, ranked)
 
         return []
 
@@ -455,8 +467,13 @@ class SerpApiProvider(SearchProvider):
     def _minimum_expected_price(self, query: str) -> float | None:
         query_lower = query.lower()
         tokens = set(self._query_tokens(query_lower))
+        min_budget, max_budget = self._budget_bounds(query)
         if self._is_accessory_query(query):
             return None
+        if max_budget is not None and self._is_generic_budget_phone_query(query):
+            return max(12000, max_budget * 0.45)
+        if min_budget is not None:
+            return min_budget
         if tokens & self.phone_brands and any(char.isdigit() for char in query_lower):
             return 5000
         if tokens & self.laptop_brands or "laptop" in query_lower or "macbook" in query_lower:
@@ -465,10 +482,84 @@ class SerpApiProvider(SearchProvider):
             return 8000
         return None
 
+    def _budget_ranked_offers(self, query: str, offers: list[Offer]) -> list[Offer]:
+        min_budget, max_budget = self._budget_bounds(query)
+        if not offers:
+            return offers
+
+        filtered = offers
+        if min_budget is not None:
+            filtered = [offer for offer in filtered if offer.price >= min_budget]
+        if max_budget is not None:
+            filtered = [offer for offer in filtered if offer.price <= max_budget]
+        if not filtered:
+            return []
+
+        if min_budget is not None and max_budget is not None:
+            midpoint = (min_budget + max_budget) / 2
+            filtered.sort(key=lambda offer: (abs(offer.price - midpoint), offer.price))
+            return filtered
+
+        if max_budget is not None:
+            filtered.sort(key=lambda offer: (max_budget - offer.price, -offer.price))
+            return filtered
+
+        if min_budget is not None:
+            filtered.sort(key=lambda offer: (offer.price - min_budget, offer.price))
+            return filtered
+
+        return offers
+
     def _looks_like_phone_query(self, query: str) -> bool:
         query_lower = query.lower()
         tokens = set(self._query_tokens(query_lower))
         return bool(tokens & self.phone_brands and any(char.isdigit() for char in query_lower))
+
+    def _is_generic_budget_phone_query(self, query: str) -> bool:
+        query_lower = query.lower()
+        tokens = set(self._query_tokens(query_lower))
+        _, max_budget = self._budget_bounds(query)
+        return max_budget is not None and (
+            bool(tokens & self.generic_phone_terms)
+            or "smartphone" in query_lower
+            or "mobile" in query_lower
+            or "phone" in query_lower
+        )
+
+    def _should_expand_store_offers(self, query: str) -> bool:
+        return not self._is_generic_budget_phone_query(query)
+
+    def _budget_bounds(self, query: str) -> tuple[float | None, float | None]:
+        range_match = re.search(
+            r"(?:between|from)\s*₹?\s*([0-9]+(?:,[0-9]+)*)(k)?\s*(?:and|to|-)\s*₹?\s*([0-9]+(?:,[0-9]+)*)(k)?",
+            query,
+            re.IGNORECASE,
+        )
+        if range_match:
+            lower = self._coerce_budget_value(range_match.group(1), bool(range_match.group(2)))
+            upper = self._coerce_budget_value(range_match.group(3), bool(range_match.group(4)))
+            if lower is not None and upper is not None:
+                return (min(lower, upper), max(lower, upper))
+
+        min_match = re.search(
+            r"(?:above|over|more than|min|min\.|starting from)\s*₹?\s*([0-9]+(?:,[0-9]+)*)(k)?",
+            query,
+            re.IGNORECASE,
+        )
+        max_match = self.budget_pattern.search(query)
+        min_budget = self._coerce_budget_value(min_match.group(1), bool(min_match.group(2))) if min_match else None
+        max_budget = self._coerce_budget_value(max_match.group(1), False) if max_match else None
+        return min_budget, max_budget
+
+    @staticmethod
+    def _coerce_budget_value(raw_value: str | None, is_thousands: bool) -> float | None:
+        if not raw_value:
+            return None
+        try:
+            value = float(raw_value.replace(",", ""))
+        except ValueError:
+            return None
+        return value * 1000 if is_thousands else value
 
     def _query_tokens(self, text: str) -> list[str]:
         tokens = re.findall(r"[a-z0-9]+", text.lower())
