@@ -61,18 +61,6 @@ You can enable one or more providers with `DATA_PROVIDERS`.
 
    The app automatically creates the `pulse_price_compare` database and `searched_products` table on startup. You can also import `database.sql` manually through phpMyAdmin.
 
-## VS Code Setup
-
-- Open the project folder in VS Code
-- Accept the recommended Python extensions when prompted
-- Use `Run and Debug` and choose `Run Pulse Price Compare`
-- Or use `Terminal > Run Task` and pick:
-  - `Install Requirements`
-  - `Run App`
-  - `Run Tests`
-
-The workspace is already configured for the `src/` layout, pytest discovery, and the bundled Python runtime.
-
 ## Submission Notes
 
 - Do not submit the raw project folder as a zip because it may include local-only directories such as `.venv/`, `.tmp/`, `__pycache__/`, and test artifacts.
