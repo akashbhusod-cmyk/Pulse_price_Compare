@@ -60,10 +60,6 @@ You can enable one or more providers with `DATA_PROVIDERS`.
    ```
 
    The app automatically creates the `pulse_price_compare` database and `searched_products` table on startup. You can also import `database.sql` manually through phpMyAdmin.
-   
-Then open:
-
-`http://127.0.0.1:5000`
 
 ## VS Code Setup
 
