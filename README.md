@@ -48,19 +48,6 @@ You can enable one or more providers with `DATA_PROVIDERS`.
 
    If you do not add a SerpApi key, the app falls back to demo mode.
 
-4. Start MySQL from XAMPP, then keep the default MySQL settings or adjust them in `.env`:
-
-   ```env
-   MYSQL_ENABLED=true
-   MYSQL_HOST=127.0.0.1
-   MYSQL_PORT=3306
-   MYSQL_USER=root
-   MYSQL_PASSWORD=
-   MYSQL_DATABASE=pulse_price_compare
-   ```
-
-   The app automatically creates the `pulse_price_compare` database and `searched_products` table on startup. You can also import `database.sql` manually through phpMyAdmin.
-
 ## Submission Notes
 
 - Do not submit the raw project folder as a zip because it may include local-only directories such as `.venv/`, `.tmp/`, `__pycache__/`, and test artifacts.
